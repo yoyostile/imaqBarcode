@@ -19,21 +19,23 @@ preview(vid);
 while true, 
     %Video-Frame wird akquiriert und in frame gespeichert
 	trigger(vid);
-    pause(1);
+    %pause(1);
 	frame = getdata(vid, 1);
+    sharpness = estimateSharpness(frame);
     %frame = denoise(frame); %schwer optionales denoising, verbraucht viel
     %zu viel Leistung.
     %frame = rgb2gray(frame);
-    
-    %Ibw = im2bw(frame, graythresh(frame));
-    I2 = radonRotate(frame);
-    %Ausgabe des prozessierten Frames
-    %imshow(I2);
-    
-    %Aufruf der 4 verschiedenen Methoden um Codes zu erkennen.
-    message_qr = decodeQR(I2)
-    message_dm = decodeMatrix(I2)
-    message_ean13 = decodeEAN13(I2)
-    message_ean8 = decodeEAN8(I2)
+    if sharpness > 2.1, 
+        %Ibw = im2bw(frame, graythresh(frame));
+        I2 = radonRotate(frame);
+        %Ausgabe des prozessierten Frames
+        %imshow(I2);
+        %Aufruf der 4 verschiedenen Methoden um Codes zu erkennen.
+        message_qr = decodeQR(I2)
+        message_dm = decodeMatrix(I2)
+        message_ean13 = decodeEAN13(I2)
+        message_ean8 = decodeEAN8(I2)
+    end
+    pause(1/10);
     %pause(3);
 end
