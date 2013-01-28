@@ -1,31 +1,4 @@
-
-
 function varargout = myCameraGUI(varargin)
-% MYCAMERAGUI MATLAB code for mycameragui.fig
-%      MYCAMERAGUI, by itself, creates a new MYCAMERAGUI or raises the existing
-%      singleton*.
-%
-%      H = MYCAMERAGUI returns the handle to a new MYCAMERAGUI or the handle to
-%      the existing singleton*.
-%
-%      MYCAMERAGUI('CALLBACK',hObject,eventData,handles,...) calls the local
-%      function named CALLBACK in MYCAMERAGUI.M with the given input arguments.
-%
-%      MYCAMERAGUI('Property','Value',...) creates a new MYCAMERAGUI or raises the
-%      existing singleton*.  Starting from the left, property value pairs are
-%      applied to the GUI before myCameraGUI_OpeningFcn gets called.  An
-%      unrecognized property name or invalid value makes property application
-%      stop.  All inputs are passed to myCameraGUI_OpeningFcn via varargin.
-%
-%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
-%      instance to run (singleton)".
-%
-% See also: GUIDE, GUIDATA, GUIHANDLES
-
-% Edit the above text to modify the response to help mycameragui
-
-% Last Modified by GUIDE v2.5 24-Jan-2013 23:14:31
-
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
@@ -46,9 +19,6 @@ end
 % End initialization code - DO NOT EDIT
 
 
-javaaddpath('.\core.jar');
-javaaddpath('.\javase.jar');
-
 % --- Executes just before mycameragui is made visible.
 function myCameraGUI_OpeningFcn(hObject, eventdata, handles, varargin)
 % This function has no output args, see OutputFcn.
@@ -65,7 +35,8 @@ handles.output = hObject;
 % starting the object will make GETSNAPSHOT return faster
 % since the connection to the camera will already have
 % been established.
-handles.video = videoinput('macvideo', 1);
+
+handles.video = videoinput('winvideo', 1);
 set(handles.video,'TimerPeriod', 0.05, ...
 'TimerFcn',['if(~isempty(gco)),'...
 'handles=guidata(gcf);'... % Update handles
@@ -75,9 +46,7 @@ set(handles.video,'TimerPeriod', 0.05, ...
 'delete(imaqfind);'... % Clean up - delete any image acquisition objects
 'end']);
 triggerconfig(handles.video,'manual');
-set(handles.video, 'FramesPerTrigger', 1);
-set(handles.video, 'TriggerRepeat', Inf); 
-
+handles.video.FramesPerTrigger = Inf; % Capture frames until we manually stop it
 
 % Update handles structure
 guidata(hObject, handles);
@@ -98,45 +67,6 @@ handles.output = hObject;
 varargout{1} = handles.output;
 
 
-% --- Executes on button press in barcode.
-function barcode_Callback(hObject, eventdata, handles)
-% hObject    handle to barcode (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-%Barcode reader     
-
-%video wird geholt
-
-src = getselectedsource(handles.video);
-get(src);
-%video properties gesetzt
-%Vertical flip einfügen
-
-while true, 
-    %Video-Frame wird akquiriert und in frame gespeichert
-	trigger(handles.video);
-    %pause(1);
-	frame = getdata(handles.video, 1);
-    sharpness = estimateSharpness(frame);
-    %frame = denoise(frame); %schwer optionales denoising, verbraucht viel
-    %zu viel Leistung.
-    %frame = rgb2gray(frame);
-    if sharpness > 2.1, 
-        %Ibw = im2bw(frame, graythresh(frame));
-        I2 = radonRotate(frame);
-        %Ausgabe des prozessierten Frames
-        %imshow(I2);
-        %Aufruf der 4 verschiedenen Methoden um Codes zu erkennen.
-        message_qr = decodeQR(I2)
-        message_dm = decodeMatrix(I2)
-        message_ean13 = decodeEAN13(I2)
-        message_ean8 = decodeEAN8(I2)
-    end
-    pause(1/10);
-    %pause(3);
-end
-
-
 % --- Executes on button press in startStopCamera.
 function startStopCamera_Callback(hObject, eventdata, handles)
 % hObject handle to startStopCamera (see GCBO)
@@ -147,13 +77,8 @@ function startStopCamera_Callback(hObject, eventdata, handles)
 if strcmp(get(handles.startStopCamera,'String'),'Start Camera')
     % Camera is off. Change button string and start camera.
     set(handles.startStopCamera,'String','Stop Camera')
-    start(handles.video)
-    
-
-    
     set(handles.startAcquisition,'Enable','on');
     set(handles.captureImage,'Enable','on');
-    
 else
     % Camera is on. Stop camera and change button string.
     set(handles.startStopCamera,'String','Start Camera')
@@ -164,13 +89,9 @@ end
 
 % --- Executes on button press in captureImage.
 function captureImage_Callback(hObject, eventdata, handles)
-% hObject    handle to captureImage (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-% frame = getsnapshot(handles.video);
-frame = get(get(handles.cameraAxes,'children'),'cdata'); % The current displayed frame
-save('testframe.mat', 'frame');
-disp('Frame saved to file ''testframe.mat''');
+frame = get(get(handles.cameraAxes, 'children'), 'cdata');
+save('testPic.mat', 'frame');
+disp('Bild gespeichert''testPic.mat''');
 
 
 % --- Executes on button press in startAcquisition.
@@ -190,12 +111,12 @@ else
     stop(handles.video);
     disp('Saving captured video...');
     
-    videodata = getdata(handles.video);
-    save('testvideo.mat', 'videodata');
+    frames = getdata(handles.video);
+    save('testvideo.mat', 'frames');
     disp('Video saved to file ''testvideo.mat''');
-    
-    start(handles.video); % Restart the camera
+    imaqmontage(frames);
     set(handles.startAcquisition,'String','Start Acquisition');
+    startStopCamera_Callback(hObject, eventdata, handles);
 end
 
 % --- Executes when user attempts to close myCameraGUI.
@@ -207,6 +128,37 @@ function myCameraGUI_CloseRequestFcn(hObject, eventdata, handles)
 % Hint: delete(hObject) closes the figure
 delete(hObject);
 delete(imaqfind);
+
+
+%Backlight Compenastion
+
+% --- Executes on selection change in backlightpop.
+function backlightpop_Callback(hObject, eventdata, handles)
+% hObject    handle to backlightpop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns backlightpop contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from backlightpop
+contents = cellstr(get(hObject,'String'));
+a=contents{get(hObject,'Value')};
+stop(handles.video);
+src = getselectedsource(handles.video);
+get(src);
+src.BacklightCompensation = a;
+start(handles.video);
+
+% --- Executes during object creation, after setting all properties.
+function backlightpop_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to backlightpop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
 
 
 %Brightness
@@ -264,6 +216,36 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
+
+%Color Enable
+
+% --- Executes on selection change in colorpop.
+function colorpop_Callback(hObject, eventdata, handles)
+% hObject    handle to colorpop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns colorpop contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from colorpop
+contents = cellstr(get(hObject,'String'));
+a=contents{get(hObject,'Value')};
+stop(handles.video);
+src = getselectedsource(handles.video);
+get(src);
+src.ColorEnable = a;
+start(handles.video);
+
+% --- Executes during object creation, after setting all properties.
+function colorpop_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to colorpop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
 
 
 %CONTRAST
@@ -526,6 +508,93 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
 end
 
 
+%Gamma
+
+% --- Executes on slider movement.
+function gammaslider_Callback(hObject, eventdata, handles)
+% hObject    handle to gammaslider (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'Value') returns position of slider
+%        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
+global a
+a=round(get(hObject,'Value')); 
+set(handles.gamma,'String',num2str(a));
+set(hObject, 'Value', a);
+
+stop(handles.video);
+src = getselectedsource(handles.video);
+get(src);
+src.Gamma = round(get(hObject,'Value'));
+start(handles.video);
+
+% --- Executes during object creation, after setting all properties.
+function gammaslider_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to gammaslider (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: slider controls usually have a light gray background.
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+
+
+function gamma_Callback(hObject, eventdata, handles)
+% hObject    handle to gamma (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of gamma as text
+%        str2double(get(hObject,'String')) returns contents of gamma as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function gamma_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to gamma (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+%Horizontal Flip
+
+% --- Executes on selection change in hflippop.
+function hflippop_Callback(hObject, eventdata, handles)
+% hObject    handle to hflippop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns hflippop contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from hflippop
+contents = cellstr(get(hObject,'String'));
+a=contents{get(hObject,'Value')};
+stop(handles.video);
+src = getselectedsource(handles.video);
+get(src);
+src.HorizontalFlip = a;
+start(handles.video);
+
+% --- Executes during object creation, after setting all properties.
+function hflippop_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to hflippop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
 %Sharpness
 
 % --- Executes on slider movement.
@@ -580,3 +649,159 @@ function sharpness_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+%Vertical Flip
+
+% --- Executes on selection change in vflippop.
+function vflippop_Callback(hObject, eventdata, handles)
+% hObject    handle to vflippop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns vflippop contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from vflippop
+contents = cellstr(get(hObject,'String'));
+a=contents{get(hObject,'Value')};
+stop(handles.video);
+src = getselectedsource(handles.video);
+get(src);
+src.VerticalFlip = a;
+start(handles.video);
+
+
+
+% --- Executes during object creation, after setting all properties.
+function vflippop_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to vflippop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+%WhiteBalance
+
+% --- Executes on slider movement.
+function whitebalanceslider_Callback(hObject, eventdata, handles)
+% hObject    handle to whitebalanceslider (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'Value') returns position of slider
+%        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
+global a
+a=round(get(hObject,'Value')); 
+set(handles.whitebalance,'String',num2str(a));
+set(hObject, 'Value', a);
+
+stop(handles.video);
+src = getselectedsource(handles.video);
+get(src);
+src.WhiteBalance = round(get(hObject,'Value'));
+start(handles.video);
+
+% --- Executes during object creation, after setting all properties.
+function whitebalanceslider_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to whitebalanceslider (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: slider controls usually have a light gray background.
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+
+
+function whitebalance_Callback(hObject, eventdata, handles)
+% hObject    handle to whitebalance (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of whitebalance as text
+%        str2double(get(hObject,'String')) returns contents of whitebalance as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function whitebalance_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to whitebalance (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on selection change in whitebalancepop.
+function whitebalancepop_Callback(hObject, eventdata, handles)
+% hObject    handle to whitebalancepop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns whitebalancepop contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from whitebalancepop
+contents = cellstr(get(hObject,'String'));
+a=contents{get(hObject,'Value')};
+stop(handles.video);
+src = getselectedsource(handles.video);
+get(src);
+src.WhiteBalanceMode = a;
+start(handles.video);
+
+% --- Executes during object creation, after setting all properties.
+function whitebalancepop_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to whitebalancepop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+%ColorSpace
+
+% --- Executes on selection change in colorspacepop.
+function colorspacepop_Callback(hObject, eventdata, handles)
+% hObject    handle to colorspacepop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns colorspacepop contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from colorspacepop
+contents = cellstr(get(hObject,'String'));
+a=contents{get(hObject,'Value')};
+vid.ReturnedColorspace=a;
+
+
+% --- Executes during object creation, after setting all properties.
+function colorspacepop_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to colorspacepop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in barcode.
+function barcode_Callback(hObject, eventdata, handles)
+% hObject    handle to barcode (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+imaqBarcode(handles);
+
+

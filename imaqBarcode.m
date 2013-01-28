@@ -1,11 +1,11 @@
-clear;
-imaqreset;
+function imaqBarcode(handles) 
+%imaqreset;
 %import der jars
 javaaddpath('.\core.jar');
 javaaddpath('.\javase.jar');
 %video wird geholt
-vid = videoinput('winvideo', 1);
-src = getselectedsource(vid);
+vid = handles.video; %videoinput('winvideo', 1);
+src = getselectedsource(handles.video);
 get(src);
 %video properties gesetzt
 src.VerticalFlip = 'on';
@@ -15,7 +15,7 @@ triggerconfig(vid, 'manual');
 
 %vid wird gestartet, preview wird angezeigt
 start(vid);
-preview(vid);
+%preview(vid);
 while true, 
     %Video-Frame wird akquiriert und in frame gespeichert
 	trigger(vid);
@@ -31,10 +31,13 @@ while true,
         %Ausgabe des prozessierten Frames
         %imshow(I2);
         %Aufruf der 4 verschiedenen Methoden um Codes zu erkennen.
-        message_qr = decodeQR(I2)
-        message_dm = decodeMatrix(I2)
-        message_ean13 = decodeEAN13(I2)
-        message_ean8 = decodeEAN8(I2)
+        message_qr = decodeQR(I2);
+        message_dm = decodeMatrix(I2);
+        message_ean13 = decodeEAN13(I2);
+        message_ean8 = decodeEAN8(I2);
+        combined = strcat(message_qr, message_dm, message_ean13, message_ean8);
+        set(handles.barcodeResult,'String',combined);
+        drawnow;
     end
     pause(1/10);
     %pause(3);
