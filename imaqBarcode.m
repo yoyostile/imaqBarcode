@@ -42,3 +42,4 @@ while true,
     pause(1/10);
     %pause(3);
 end
+stop(vid);
